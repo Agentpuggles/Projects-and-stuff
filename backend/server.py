@@ -49,7 +49,7 @@ class Card(BaseModel):
     colors: List[str] = []
     color_identity: List[str] = []
     image_uris: Optional[Dict[str, str]] = None
-    prices: Optional[Dict[str, str]] = None
+    prices: Optional[Dict[str, Optional[str]]] = None
     set_name: Optional[str] = None
     rarity: Optional[str] = None
     legalities: Optional[Dict[str, str]] = None
