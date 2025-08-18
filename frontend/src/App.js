@@ -206,6 +206,7 @@ function App() {
                     onClick={searchCards} 
                     disabled={loading}
                     className="bg-purple-600 hover:bg-purple-700"
+                    type="button"
                   >
                     {loading ? <Sparkles className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                     Search
