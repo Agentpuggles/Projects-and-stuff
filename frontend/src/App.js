@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Sword, Users, TrendingUp, Sparkles, Crown, DollarSign, Zap } from 'lucide-react';
+import { Search, Sword, Users, TrendingUp, Sparkles, Crown, DollarSign, Zap, Plus, Minus, Save, Trash2, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Badge } from './components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './components/ui/dialog';
+import { Alert, AlertDescription } from './components/ui/alert';
 import './App.css';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -16,10 +17,14 @@ function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [decks, setDecks] = useState([]);
+  const [selectedDeck, setSelectedDeck] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [gameInProgress, setGameInProgress] = useState(false);
   const [activeTab, setActiveTab] = useState('search');
   const [commanderRecommendations, setCommanderRecommendations] = useState('');
+  const [newDeckName, setNewDeckName] = useState('');
+  const [showCreateDeck, setShowCreateDeck] = useState(false);
+  const [deckValidation, setDeckValidation] = useState(null);
 
   useEffect(() => {
     fetchDecks();
@@ -48,6 +53,80 @@ function App() {
       setSearchResults([]);
     }
     setLoading(false);
+  };
+
+  const createDeck = async () => {
+    if (!newDeckName.trim()) return;
+    
+    setLoading(true);
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/decks`, {
+        name: newDeckName
+      });
+      setDecks([response.data, ...decks]);
+      setNewDeckName('');
+      setShowCreateDeck(false);
+      setSelectedDeck(response.data);
+    } catch (error) {
+      console.error('Error creating deck:', error);
+    }
+    setLoading(false);
+  };
+
+  const addCardToDeck = async (cardId, deckId = null) => {
+    const targetDeckId = deckId || selectedDeck?.id;
+    if (!targetDeckId) return;
+    
+    try {
+      const response = await axios.put(`${BACKEND_URL}/api/decks/${targetDeckId}/add-card`, null, {
+        params: { card_id: cardId, quantity: 1 }
+      });
+      
+      // Update the selected deck if it's the one being modified
+      if (selectedDeck?.id === targetDeckId) {
+        setSelectedDeck(response.data.deck);
+        setDeckValidation(response.data.validation);
+      }
+      
+      // Refresh decks list
+      fetchDecks();
+    } catch (error) {
+      console.error('Error adding card to deck:', error);
+    }
+  };
+
+  const removeCardFromDeck = async (cardId, deckId = null) => {
+    const targetDeckId = deckId || selectedDeck?.id;
+    if (!targetDeckId) return;
+    
+    try {
+      const response = await axios.delete(`${BACKEND_URL}/api/decks/${targetDeckId}/remove-card/${cardId}`, {
+        params: { quantity: 1 }
+      });
+      
+      // Update the selected deck if it's the one being modified
+      if (selectedDeck?.id === targetDeckId) {
+        setSelectedDeck(response.data.deck);
+        setDeckValidation(response.data.validation);
+      }
+      
+      // Refresh decks list
+      fetchDecks();
+    } catch (error) {
+      console.error('Error removing card from deck:', error);
+    }
+  };
+
+  const deleteDeck = async (deckId) => {
+    try {
+      await axios.delete(`${BACKEND_URL}/api/decks/${deckId}`);
+      setDecks(decks.filter(d => d.id !== deckId));
+      if (selectedDeck?.id === deckId) {
+        setSelectedDeck(null);
+      }
+    } catch (error) {
+      console.error('Error deleting deck:', error);
+    }
   };
 
   const getCommanderRecommendations = async (colors = '', playstyle = 'aggressive') => {
@@ -242,6 +321,19 @@ function App() {
                                       </div>
                                     )}
                                   </div>
+                                  {selectedDeck && (
+                                    <Button
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        addCardToDeck(card.id);
+                                      }}
+                                      className="mt-2 w-full bg-green-600 hover:bg-green-700"
+                                    >
+                                      <Plus className="w-3 h-3 mr-1" />
+                                      Add to Deck
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </CardContent>
@@ -287,6 +379,16 @@ function App() {
                                   {getPriceDisplay(card.prices)}
                                 </div>
                               </div>
+
+                              {selectedDeck && (
+                                <Button
+                                  onClick={() => addCardToDeck(card.id)}
+                                  className="w-full bg-green-600 hover:bg-green-700"
+                                >
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  Add to {selectedDeck.name}
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </DialogContent>
@@ -366,52 +468,264 @@ function App() {
             </Card>
           </TabsContent>
 
-          {/* Decks Tab */}
+          {/* Enhanced Decks Tab */}
           <TabsContent value="decks" className="space-y-6">
-            <Card className="bg-black/20 backdrop-blur border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Sword className="w-5 h-5 mr-2 text-orange-400" />
-                  Deck Manager
-                </CardTitle>
-                <CardDescription className="text-purple-200">
-                  Build and manage your Commander decks with power level analysis
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {decks.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Sword className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                    <p className="text-gray-400 mb-4">No decks created yet</p>
-                    <Button className="bg-purple-600 hover:bg-purple-700">
-                      Create Your First Deck
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Deck List */}
+              <div className="lg:col-span-1">
+                <Card className="bg-black/20 backdrop-blur border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Sword className="w-5 h-5 mr-2 text-orange-400" />
+                        My Decks
+                      </div>
+                      <Button
+                        onClick={() => setShowCreateDeck(true)}
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {decks.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <Sword className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No decks yet</p>
+                      </div>
+                    ) : (
+                      decks.map((deck) => (
+                        <Card 
+                          key={deck.id} 
+                          className={`cursor-pointer transition-colors ${
+                            selectedDeck?.id === deck.id 
+                              ? 'bg-purple-600/20 border-purple-500/50' 
+                              : 'bg-white/5 border-white/10 hover:bg-white/10'
+                          }`}
+                          onClick={() => setSelectedDeck(deck)}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-white text-sm truncate">{deck.name}</h3>
+                                <p className="text-xs text-purple-300">
+                                  {deck.commander?.name || 'No Commander'}
+                                </p>
+                                <div className="flex items-center justify-between mt-2">
+                                  <span className="text-xs text-gray-400">{deck.total_cards}/100 cards</span>
+                                  {getPowerLevelBadge(deck.power_level)}
+                                </div>
+                                <p className="text-xs text-green-400 mt-1">
+                                  ${deck.total_price_aud?.toFixed(2) || '0.00'} AUD
+                                </p>
+                              </div>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteDeck(deck.id);
+                                }}
+                                size="sm"
+                                variant="destructive"
+                                className="ml-2 h-6 w-6 p-0"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Deck Details */}
+              <div className="lg:col-span-2">
+                {selectedDeck ? (
+                  <Card className="bg-black/20 backdrop-blur border-white/10">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center justify-between">
+                        <div>
+                          {selectedDeck.name}
+                          {getPowerLevelBadge(selectedDeck.power_level)}
+                        </div>
+                        <div className="text-sm text-gray-300">
+                          {selectedDeck.total_cards}/100 cards
+                        </div>
+                      </CardTitle>
+                      <CardDescription className="text-purple-200">
+                        Total Value: ${selectedDeck.total_price_usd?.toFixed(2) || '0.00'} USD / 
+                        ${selectedDeck.total_price_aud?.toFixed(2) || '0.00'} AUD
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Validation Alerts */}
+                      {deckValidation && (
+                        <div className="space-y-2">
+                          {deckValidation.errors?.map((error, idx) => (
+                            <Alert key={idx} className="border-red-500/50 bg-red-500/10">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription className="text-red-300">
+                                {error}
+                              </AlertDescription>
+                            </Alert>
+                          ))}
+                          {deckValidation.valid && (
+                            <Alert className="border-green-500/50 bg-green-500/10">
+                              <CheckCircle className="h-4 w-4" />
+                              <AlertDescription className="text-green-300">
+                                Deck is valid for Commander format!
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Commander */}
+                      {selectedDeck.commander && (
+                        <div>
+                          <h4 className="font-semibold text-white mb-2 flex items-center">
+                            <Crown className="w-4 h-4 mr-2 text-yellow-400" />
+                            Commander
+                          </h4>
+                          <Card className="bg-white/5 border-white/10">
+                            <CardContent className="p-3">
+                              <div className="flex items-center space-x-3">
+                                {selectedDeck.commander.image_uri && (
+                                  <img 
+                                    src={selectedDeck.commander.image_uri} 
+                                    alt={selectedDeck.commander.name}
+                                    className="w-12 h-16 rounded object-cover"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <h5 className="font-semibold text-white">{selectedDeck.commander.name}</h5>
+                                  <p className="text-sm text-purple-300">{selectedDeck.commander.type_line}</p>
+                                  <p className="text-xs text-green-400">
+                                    ${selectedDeck.commander.price_aud?.toFixed(2) || '0.00'} AUD
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+
+                      {/* Cards List */}
+                      <div>
+                        <h4 className="font-semibold text-white mb-2">
+                          Cards ({selectedDeck.cards?.length || 0})
+                        </h4>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {selectedDeck.cards?.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400">
+                              <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-sm">No cards added yet</p>
+                              <p className="text-xs">Search for cards and add them to your deck</p>
+                            </div>
+                          ) : (
+                            selectedDeck.cards?.map((card, idx) => (
+                              <Card key={idx} className="bg-white/5 border-white/10">
+                                <CardContent className="p-2">
+                                  <div className="flex items-center space-x-3">
+                                    {card.image_uri && (
+                                      <img 
+                                        src={card.image_uri} 
+                                        alt={card.name}
+                                        className="w-8 h-10 rounded object-cover"
+                                      />
+                                    )}
+                                    <div className="flex-1">
+                                      <h6 className="font-medium text-white text-sm">{card.name}</h6>
+                                      <p className="text-xs text-purple-300">{card.type_line}</p>
+                                      <p className="text-xs text-green-400">
+                                        ${(card.price_aud * card.quantity)?.toFixed(2) || '0.00'} AUD
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Button
+                                        onClick={() => removeCardFromDeck(card.card_id)}
+                                        size="sm"
+                                        variant="destructive"
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <span className="text-white text-sm min-w-[20px] text-center">
+                                        {card.quantity}
+                                      </span>
+                                      <Button
+                                        onClick={() => addCardToDeck(card.card_id)}
+                                        size="sm"
+                                        className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="bg-black/20 backdrop-blur border-white/10">
+                    <CardContent className="p-8 text-center">
+                      <Sword className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-white mb-2">Select a Deck</h3>
+                      <p className="text-gray-400 mb-4">Choose a deck from the list to view and edit its contents</p>
+                      <Button
+                        onClick={() => setShowCreateDeck(true)}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create New Deck
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+
+            {/* Create Deck Dialog */}
+            <Dialog open={showCreateDeck} onOpenChange={setShowCreateDeck}>
+              <DialogContent className="bg-black/90 border-white/20">
+                <DialogHeader>
+                  <DialogTitle className="text-white">Create New Deck</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Enter deck name..."
+                    value={newDeckName}
+                    onChange={(e) => setNewDeckName(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white placeholder-white/50"
+                    onKeyPress={(e) => e.key === 'Enter' && createDeck()}
+                  />
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={createDeck}
+                      disabled={!newDeckName.trim() || loading}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    >
+                      {loading ? <Sparkles className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                      Create Deck
+                    </Button>
+                    <Button
+                      onClick={() => setShowCreateDeck(false)}
+                      variant="outline"
+                      className="border-white/20 text-white"
+                    >
+                      Cancel
                     </Button>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {decks.map((deck) => (
-                      <Card key={deck.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <h3 className="font-semibold text-white">{deck.name}</h3>
-                            {getPowerLevelBadge(deck.power_level)}
-                          </div>
-                          <p className="text-sm text-purple-300 mb-2">
-                            Commander: {deck.commander?.name || 'Unknown'}
-                          </p>
-                          <div className="flex items-center justify-between text-xs text-gray-400">
-                            <span>{deck.total_cards} cards</span>
-                            <span>
-                              ${deck.total_price_aud?.toFixed(2) || '0.00'} AUD
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Play Test Tab */}
