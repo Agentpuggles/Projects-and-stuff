@@ -117,9 +117,9 @@ async def fetch_scryfall_data(endpoint: str, params: Dict = None) -> Dict:
             else:
                 raise HTTPException(status_code=response.status, detail="Scryfall API error")
 
-def convert_usd_to_aud(usd_price: float) -> float:
+def convert_usd_to_aud(usd_price: float) -> str:
     """Convert USD price to AUD"""
-    return round(usd_price * USD_TO_AUD_RATE, 2)
+    return str(round(usd_price * USD_TO_AUD_RATE, 2))
 
 def calculate_deck_power_level(cards: List[Dict]) -> int:
     """Calculate WOTC bracket power level (1-5) based on deck composition"""
