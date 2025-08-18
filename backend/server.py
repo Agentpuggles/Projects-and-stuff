@@ -207,7 +207,9 @@ async def search_cards(q: str, limit: int = 20):
                     try:
                         aud_prices[f"{price_type}_aud"] = convert_usd_to_aud(float(usd_price))
                     except (ValueError, TypeError):
-                        aud_prices[f"{price_type}_aud"] = 0
+                        aud_prices[f"{price_type}_aud"] = None
+                else:
+                    aud_prices[f"{price_type}_aud"] = None
             
             card = Card(
                 id=card_data["id"],
